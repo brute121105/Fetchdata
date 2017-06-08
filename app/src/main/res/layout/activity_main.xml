@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:theme="@android:style/Theme.Black.NoTitleBar"
+    tools:context="hyj.fetchdata.MainActivity">
+
+    <TextView
+        android:id="@+id/spinnerText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="sdddddsd"
+        android:textSize="20sp"
+        android:textColor="#000000" />
+    <Spinner android:id="@+id/Spinner01"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+    <EditText
+        android:hint="发送消息url"
+        android:gravity="top"
+        android:height="100dp"
+        android:id="@+id/text_url"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <Button
+        android:id="@+id/test_sendMsg"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="测试url"
+        android:textSize="18sp" />
+
+    <Button
+        android:id="@+id/open_assist"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="开启权限"
+        android:textSize="18sp" />
+
+  <!--  <Button
+        android:id="@+id/restart_wx"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="重启微信"
+        android:textSize="18sp" />-->
+
+</LinearLayout>
