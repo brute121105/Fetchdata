@@ -70,6 +70,7 @@ public class MainActivity extends AppCompatActivity {
         spinner.setOnItemSelectedListener(new SpinnerSelectedListener());
         //设置默认值
         spinner.setVisibility(View.VISIBLE);
+
     }
     private View.OnClickListener testSendListen = new View.OnClickListener() {
         @Override

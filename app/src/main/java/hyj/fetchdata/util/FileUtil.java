@@ -67,12 +67,12 @@ public class FileUtil {
         }
     }
     //文件上传到服务器
-    public static void uploadMultiFile(final String url,final String filePath,final String fileName) {
+    public static void uploadMultiFile(final String url,final File file,final String fileName) {
         //开启子线程执行上传，避免主线程堵塞
         new Thread(new Runnable() {
             @Override
             public void run() {
-                File file = new File(filePath, fileName);
+                //File file = new File(filePath, fileName);
                 RequestBody fileBody = RequestBody.create(MediaType.parse("application/octet-stream"), file);
                 RequestBody requestBody = new MultipartBody.Builder()
                         .setType(MultipartBody.FORM)

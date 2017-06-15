@@ -1,15 +1,28 @@
 package hyj.fetchdata;
 
+import org.litepal.crud.DataSupport;
+
 /**
  * Created by Administrator on 2017/6/6.
  */
 
-public class Msg {
+public class Msg  extends DataSupport {
     private String privateKey;
     private String groupName;
     private String nickName;
     private String message;
     private String time;
+
+
+    public Msg(String groupName, String nickName, String message, String time) {
+        this.groupName = groupName;
+        this.nickName = nickName;
+        this.message = message;
+        this.time = time;
+    }
+
+    public Msg() {
+    }
 
     public String getPrivateKey() {
         return privateKey;

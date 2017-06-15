@@ -15,6 +15,6 @@ public class LogUtil {
         String logMsg = dateTime+" "+tab+"---->"+msg;
         //以天为单位生成日志文件
         System.out.println(logMsg);
-        FileUtil.writeContent2File("/sdcard/A_hyj_log/","log_"+dateTime.substring(0,10)+".txt",logMsg);
+        FileUtil.writeContent2File("/sdcard/A_hyj_log/","log_"+dateTime.substring(0,13)+":00.txt",logMsg);
     }
 }

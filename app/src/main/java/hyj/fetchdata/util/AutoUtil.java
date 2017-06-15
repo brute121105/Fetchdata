@@ -59,6 +59,16 @@ public class AutoUtil {
             performClick(nodeInfo.getParent(),record,recordAction);
         }
     }
+    //执行LONG点击、记录下次操作、并打印日志
+    public static void performLongClick(AccessibilityNodeInfo nodeInfo,Map<String,String> record, String recordAction) {
+        if(nodeInfo == null)  return;
+        if(nodeInfo.isClickable()) {
+            nodeInfo.performAction(AccessibilityNodeInfo.ACTION_LONG_CLICK);
+            recordAndLog(record,recordAction);
+        } else {
+            performLongClick(nodeInfo.getParent(),record,recordAction);
+        }
+    }
     //执行点击、记录下次操作、并打印日志
     public static void performClickAndExpect(AccessibilityNodeInfo nodeInfo,Map<String,String> record, String recordAction
             ,AccessibilityService context,AccessibilityNodeInfo rootNode,String id,String text) {
