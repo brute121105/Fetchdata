@@ -23,6 +23,7 @@ import static android.content.ContentValues.TAG;
  */
 
 public class FileUtil {
+    boolean successFlag = false;
     //创建路径和文件
     public static void createFile2Path(String filePathName,String fileName){
         /**
@@ -67,18 +68,31 @@ public class FileUtil {
         }
     }
     //文件上传到服务器
-    public static void uploadMultiFile(final String url,final File file,final String fileName) {
+    public static void uploadMultiFile(String url, String data, File file, final String fileName) {
         //开启子线程执行上传，避免主线程堵塞
-        new Thread(new Runnable() {
+      /*  new Thread(new Runnable() {
             @Override
-            public void run() {
+            public void run() {*/
                 //File file = new File(filePath, fileName);
-                RequestBody fileBody = RequestBody.create(MediaType.parse("application/octet-stream"), file);
-                RequestBody requestBody = new MultipartBody.Builder()
-                        .setType(MultipartBody.FORM)
-                        .addFormDataPart("file",fileName, fileBody)
-                        .addFormDataPart("name",fileName)//name是对方接收的另一个参数，文件名
-                        .build();
+                //if(file==null) file = new File("");
+          if(file==null) file = new File("");
+          RequestBody fileBody = RequestBody.create(MediaType.parse("application/octet-stream"), file);
+                MultipartBody.Builder builder = new MultipartBody.Builder()
+                        .setType(MultipartBody.FORM);
+                       /* .addFormDataPart("file",fileName, fileBody)
+                        .addFormDataPart("name",fileName)
+                        .addFormDataPart("data",data);*///name是对方接收的另一个参数，文件名
+              if(fileName!=null){
+                  System.out.println("fileName--->"+fileName);
+                  builder. addFormDataPart("file",fileName, fileBody)
+                          .addFormDataPart("name",fileName);
+              }
+
+              if(data!=null){
+                  builder. addFormDataPart("data",data);
+              }
+
+                RequestBody requestBody = builder.build();
                 Request request = new Request.Builder()
                         .url(url)
                         .post(requestBody)
@@ -96,10 +110,11 @@ public class FileUtil {
                     }
                     @Override
                     public void onResponse(Call call, Response response) throws IOException {
-                        Log.i(TAG, "uploadMultiFile() response=" + response.body().string());
+                        String responseStr = response.body().string();
+                        Log.i(TAG, "uploadMultiFile() response=" +responseStr );
                     }
                 });
-            }
-        }).start();
+            //}
+        //}).start();
     }
 }

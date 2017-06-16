@@ -2,6 +2,7 @@ package hyj.fetchdata;
 
 import android.accessibilityservice.AccessibilityService;
 import android.content.SharedPreferences;
+import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
@@ -12,18 +13,32 @@ import com.alibaba.fastjson.JSON;
 import org.litepal.crud.DataSupport;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import hyj.fetchdata.util.AutoUtil;
 import hyj.fetchdata.util.Constants;
 import hyj.fetchdata.util.FileUtil;
 import hyj.fetchdata.util.LogUtil;
 import hyj.fetchdata.util.OkHttpUtil;
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+
+import static android.content.ContentValues.TAG;
 
 public class ChatService extends AccessibilityService {
     Map<String,Set<String>> temp = new HashMap<String,Set<String>>();
@@ -62,7 +77,7 @@ public class ChatService extends AccessibilityService {
 
             if(root==null){
                 Toast.makeText(GlobalApplication.getContext(), "开启失败，请退出微信重新打开!", Toast.LENGTH_LONG).show();
-                LogUtil.d("root",root+"");
+                LogUtil.d("开启失败，请退出微信重新打开root",root+"");
                 return;
             }
             List<AccessibilityNodeInfo> listView= root.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/bny");
@@ -121,15 +136,25 @@ public class ChatService extends AccessibilityService {
                 break;
             }
 
-            forImageProcess(images1);
+            if(WeixinAutoHandler.IS_AUTO_ADDFR){
+                forImageProcess(images1);
+            }
 
             AccessibilityNodeInfo msgRoot2 = getRootInActiveWindow();
             AccessibilityNodeInfo backBtn = AutoUtil.findNodeInfosById(msgRoot2,"com.tencent.mm:id/go");;
+            int wait2MsgNum=0;
             while (backBtn==null){
                 AutoUtil.sleep(300);
-                System.out.println("record--->等待获取返回按钮");
+                LogUtil.d("myLog","等待获取返回按钮"+wait2MsgNum);
                 msgRoot2 = getRootInActiveWindow();
                 backBtn = AutoUtil.findNodeInfosById(msgRoot2,"com.tencent.mm:id/go");
+                wait2MsgNum = wait2MsgNum+1;
+                if(wait2MsgNum==20){
+                    isOver = true;
+                    AutoUtil.recordAndLog(record,Constants.CHAT_LISTENING);
+                    LogUtil.d("myLog","等待超时，尝试20次无法进入消息列表，重置监听状态!");
+                    return;
+                }
             }
             ims = msgRoot2.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/im");
             messageProcess(ims,msgRoot2);
@@ -149,40 +174,7 @@ public class ChatService extends AccessibilityService {
         }
 
     }
-    class CheckThread extends Thread{
-        @Override
-        public void run() {
-            while (true){
-                AutoUtil.sleep(1000*60*3);
-                if(root==null){
-                    System.out.println("root---null");
-                    continue;
-                }
-                System.out.println("recordAction--->"+record.get("recordAction"));
-                AccessibilityNodeInfo backBtn = AutoUtil.findNodeInfosById(root,"com.tencent.mm:id/go");
-                if(backBtn!=null&&AutoUtil.checkAction(record,Constants.CHAT_LISTENING)){
-                    System.out.println("----调整");
-                    AutoUtil.recordAndLog(record,Constants.CHAT_ACTION_04);
-                    return;
-                }else{
-                    System.out.println("---btn is null");
-                }
 
-                List<AccessibilityNodeInfo> listView= root.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/bny");
-                if(listView!=null&&listView.size()>0&&listView.get(0).getChildCount()>baseNum){
-                    AccessibilityNodeInfo childNode = listView.get(0).getChild(baseNum);
-                    AccessibilityNodeInfo imgNode = AutoUtil.findNodeInfosById(childNode,"com.tencent.mm:id/ia");
-                    if(imgNode!=null&&!AutoUtil.checkAction(record,Constants.CHAT_LISTENING)) {
-                        System.out.println("----调整");
-                        AutoUtil.recordAndLog(record,Constants.CHAT_LISTENING);
-                    }
-                }else{
-                    System.out.println("---List is null");
-                }
-            }
-
-        }
-    }
     private void getqImageANdNameThenClidk(List<AccessibilityNodeInfo> listView){
         int childCount = listView.get(0).getChildCount();
         //int index = qNum>childCount?childCount:qNum;
@@ -209,9 +201,9 @@ public class ChatService extends AccessibilityService {
 
     private void forImageProcess(List<AccessibilityNodeInfo> images){
         if(images==null||images.isEmpty()) return;
-        int count = 1;
+        int count = 0;
         while (true){
-            if(imageProcess(images.get(images.size()-count))) break;
+            imageProcess(images.get(count));
             AccessibilityNodeInfo backBtn=null;
             AccessibilityNodeInfo root=null;
             while (backBtn==null){
@@ -224,7 +216,7 @@ public class ChatService extends AccessibilityService {
                 System.out.println("record--->图片等待获取返回按钮");
             }
             images = root.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/a72");
-            if((images.size()-count)<=0){
+            if(images.size()-1<=count){
                 break;
             }
             count = count+1;
@@ -286,15 +278,17 @@ public class ChatService extends AccessibilityService {
         File file = new File("/sdcard/tencent/MicroMsg/WeiXin");
         if(file.exists()){
             File[] files = file.listFiles();
-            if(files!=null&&files.length>1){
+            if(files!=null&&files.length>0){
+                boolean fileIsExist = false;
                 int fileNums = files.length;
                 File newFile = files[fileNums-1];
-                boolean fileIsExist = false;
-                for(int i=fileNums-2;i>0;i--){
-                    if(newFile.length()==files[i].length()){
-                        fileIsExist = true;
-                        newFile.delete();
-                        System.out.println("----->删除图片");
+                if(files.length>1){
+                    for(int i=fileNums;i>=2;i--){
+                        if(newFile.length()==files[i-2].length()){
+                            fileIsExist = true;
+                            newFile.delete();
+                            System.out.println("----->删除图片");
+                        }
                     }
                 }
                 if(!fileIsExist){
@@ -305,6 +299,21 @@ public class ChatService extends AccessibilityService {
         }
         return filename;
     }
+    class CompratorByLastModified implements Comparator<File> {
+        public int compare(File f1, File f2) {
+            long diff = f1.lastModified() - f2.lastModified();
+            if (diff > 0)
+                return 1;
+            else if (diff == 0)
+                return 0;
+            else
+                return -1;
+        }
+
+        public boolean equals(Object obj) {
+            return true;
+        }
+    }
     class FileThread extends Thread{
         @Override
         public void run() {
@@ -314,7 +323,8 @@ public class ChatService extends AccessibilityService {
                     String filename = uploadFiles.remove(0);
                     File uploadFile = new File("/sdcard/tencent/MicroMsg/WeiXin/"+filename);
                     System.out.println("------开始上传文件----"+filename);
-                    FileUtil.uploadMultiFile("http://39.108.72.49:8080/upload",uploadFile,filename);
+                    uploadMultiFile("http://39.108.72.49:8080/upload",null,uploadFile,filename);
+                    //FileUtil.uploadMultiFile(url,uploadFile,filename);
                 }
             }
         }
@@ -328,10 +338,72 @@ public class ChatService extends AccessibilityService {
                     List<Msg> msgs = sendMsgs.remove(0);
                     String json = JSON.toJSONString(msgs);
                     System.out.println("------开始发送消息--------"+json);
-                    LogUtil.d("okHttp",OkHttpUtil.okHttpPost(url,json));
+                    uploadMultiFile(url,msgs,null,null);
+                    //LogUtil.d("okHttp",OkHttpUtil.okHttpPost(url,json));
                 }
             }
         }
+    }
+    //文件上传到服务器
+    public void uploadMultiFile(String url, final List<Msg> msgs, File file, final String fileName) {
+        if(file==null) file = new File("");
+        RequestBody fileBody = RequestBody.create(MediaType.parse("application/octet-stream"), file);
+        MultipartBody.Builder builder = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM);
+
+        if(fileName!=null){
+            System.out.println("fileName--->"+fileName);
+            builder. addFormDataPart("file",fileName, fileBody)
+                    .addFormDataPart("name",fileName);
+        }
+
+        if(msgs!=null){
+            builder. addFormDataPart("data",JSON.toJSONString(msgs));
+        }
+
+        RequestBody requestBody = builder.build();
+        Request request = new Request.Builder()
+                .url(url)
+                .post(requestBody)
+                .build();
+        final okhttp3.OkHttpClient.Builder httpBuilder = new OkHttpClient.Builder();
+        OkHttpClient okHttpClient  = httpBuilder
+                //设置超时
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .writeTimeout(15, TimeUnit.SECONDS)
+                .build();
+        okHttpClient.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                Log.e(TAG, "请求失败 e=" + e);
+                if(fileName!=null){
+                    Log.i(TAG, "图片上传失败-->" +fileName );
+                    uploadFiles.add(fileName);
+                }else if(msgs!=null){
+                    sendMsgs.add(msgs);
+                    Log.i(TAG, "数据发送失败-->" +JSON.toJSONString(msgs));
+                }
+            }
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                String responseStr = response.body().string();
+                if(fileName!=null){
+                    if(responseStr.indexOf("文件上传成功")>-1){
+                        Log.i(TAG, "图片上传成功 response=" +responseStr );
+                    }else{
+                        Log.i(TAG, "图片上传失败 response=" +responseStr );
+                        uploadFiles.add(fileName);
+                    }
+                }else if(msgs!=null){
+                    if(responseStr.indexOf("已上传数据")>-1){
+                        Log.i(TAG, "数据发送成功 response=" +responseStr );
+                    }else{
+                        Log.i(TAG, "数据发送失败 response=" +responseStr );
+                        sendMsgs.add(msgs);
+                    }
+                }
+            }
+        });
     }
     private void messageProcess(List<AccessibilityNodeInfo> ims,AccessibilityNodeInfo msgRoot){
         oldSet = temp.get(qName);
@@ -353,7 +425,6 @@ public class ChatService extends AccessibilityService {
                 String text = im.getText()+"";
                 //11
                 AccessibilityNodeInfo textParent = im.getParent();
-                getChild(textParent);
                 if(textParent.getChildCount()==3){
                     nickName = textParent.getChild(1).getText()+"";
                 }else if(textParent.getChildCount()==4){//带时间 或 声音
