@@ -1,6 +1,8 @@
 package hyj.fetchdata;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -16,5 +18,6 @@ public class WeixinAutoHandler {
     }
 
     public static boolean IS_AUTO_ADDFR=false;
+    public static  List<List<Msg>> sendMsgs = new ArrayList<List<Msg>>();
 
 }

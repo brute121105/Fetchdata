@@ -1,7 +1,13 @@
 package hyj.fetchdata;
 
 import android.accessibilityservice.AccessibilityService;
+import android.app.KeyguardManager;
+import android.app.Notification;
+import android.app.PendingIntent;
+import android.content.Context;
 import android.content.SharedPreferences;
+import android.media.MediaPlayer;
+import android.os.PowerManager;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
@@ -14,8 +20,10 @@ import org.litepal.crud.DataSupport;
 
 import java.io.File;
 import java.io.IOException;
+import java.sql.SQLOutput;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -39,6 +47,7 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 import static android.content.ContentValues.TAG;
+import static android.os.PowerManager.*;
 
 public class ChatService extends AccessibilityService {
     Map<String,Set<String>> temp = new HashMap<String,Set<String>>();
@@ -52,7 +61,9 @@ public class ChatService extends AccessibilityService {
     List<Msg> saveTempDbMsgs = new ArrayList<Msg>();
     Set<String> oldSet;
     List<String> uploadFiles = new ArrayList<String>();
-    List<List<Msg>> sendMsgs = new ArrayList<List<Msg>>();
+    static  List<List<Msg>> sendMsgs = new ArrayList<List<Msg>>();
+    FileThread fileThread;
+    SendMsgThread sendMsgThread;
     public ChatService() {
         SharedPreferences sharedPreferences = GlobalApplication.getContext().getSharedPreferences("url",MODE_PRIVATE);
         url = sharedPreferences.getString("url","");
@@ -60,17 +71,28 @@ public class ChatService extends AccessibilityService {
         LogUtil.d("url|qnum",url+"--"+qNum);
         AutoUtil.recordAndLog(record,Constants.CHAT_LISTENING);
         isStart=true;
-        new FileThread().start();
-        new SendMsgThread().start();
+        new hyj.fetchdata.SendMsgThread(url,null,null).start();
+        /*fileThread = new FileThread();
+        fileThread.start();
+        sendMsgThread = new SendMsgThread();
+        sendMsgThread.start();*/
     }
     String qName="";
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-       /* if(isStart){
-            new CheckThread().start();
-        }*/
+        String className = event.getClassName()+"";
+        String packageName = event.getPackageName()+"";
         isStart=false;
         int eventType = event.getEventType();
+        System.out.println("---->"+eventType);
+        //---jiesuo
+        if(!pm.isScreenOn()&&eventType==AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED){
+            System.out.println("---->"+eventType+" packageName:"+packageName+" className:"+className);
+            nocificationPro(event);
+            AutoUtil.recordAndLog(record,Constants.CHAT_ACTION_04);
+            return;
+        }
+        //--jiesuo
         root = getRootInActiveWindow();
         //LogUtil.d("isOver|action|eventType","isOver:"+isOver+"--"+"action:"+record.get("recordAction")+"--"+"eventType:"+eventType+"");
         if(isOver){
@@ -80,17 +102,22 @@ public class ChatService extends AccessibilityService {
                 LogUtil.d("开启失败，请退出微信重新打开root",root+"");
                 return;
             }
-            List<AccessibilityNodeInfo> listView= root.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/bny");
-            if(listView==null||listView.size()==0){
-                LogUtil.d("chatService","列表信息为空");
-                return;
+
+            if(AutoUtil.checkAction(record,Constants.CHAT_LISTENING)){
+                List<AccessibilityNodeInfo> listView= root.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/bny");
+                if(listView==null||listView.size()==0){
+                    LogUtil.d("chatService","列表信息为空");
+                    return;
+                }
+                getqImageANdNameThenClidk(listView);
             }
-            getqImageANdNameThenClidk(listView);
+
 
             if(AutoUtil.checkAction(record,Constants.CHAT_ACTION_04)){
                 MyThread thread = new MyThread(root);
                 thread.start();
             }
+
         }
     }
 
@@ -112,6 +139,11 @@ public class ChatService extends AccessibilityService {
     @Override
     public void onInterrupt() {
     }
+    @Override
+    protected void onServiceConnected() {
+        super.onServiceConnected();
+        pm=(PowerManager)GlobalApplication.getContext().getSystemService(Context.POWER_SERVICE);
+    }
     private class MyThread extends Thread{
         AccessibilityNodeInfo root;
         public MyThread(AccessibilityNodeInfo root){
@@ -124,18 +156,29 @@ public class ChatService extends AccessibilityService {
 
             List<AccessibilityNodeInfo> ims=null;
             List<AccessibilityNodeInfo> images1 = null;
+            int tryCount =0;
             while (true){
                 AutoUtil.sleep(200);
                 AccessibilityNodeInfo msgRoot = getRootInActiveWindow();
+                if(msgRoot==null){
+                    isOver = true;
+                    return;
+                }
+                qName = getQnameById(msgRoot);
                 ims = msgRoot.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/im");
                 images1 =  msgRoot.findAccessibilityNodeInfosByViewId("com.tencent.mm:id/a72");
-                if(ims==null&&images1==null){
-                    LogUtil.d("chatService","消息列表为空");
+                if(ims==null&&images1==null||"".equals(qName)){
+                    LogUtil.d("chatService","消息列表为空 or qName is null");
+                    tryCount = tryCount+1;
+                    if(tryCount==20){
+                        AutoUtil.recordAndLog(record,Constants.CHAT_LISTENING);
+                        isOver = true;
+                        return;
+                    }
                     continue;
                 }
                 break;
             }
-
             if(WeixinAutoHandler.IS_AUTO_ADDFR){
                 forImageProcess(images1);
             }
@@ -243,7 +286,7 @@ public class ChatService extends AccessibilityService {
                         List<Msg> msgs = new ArrayList<Msg>();
                         Msg msg = new Msg(qName,nickName,"系统提示：图片加载失败 or 视频或其他不支持",AutoUtil.getCurrentTime());
                         msgs.add(msg);
-                        sendMsgs.add(msgs);
+                        WeixinAutoHandler.sendMsgs.add(msgs);
 
                         return isSameImage;
                     }
@@ -262,7 +305,7 @@ public class ChatService extends AccessibilityService {
                         List<Msg> msgs = new ArrayList<Msg>();
                         Msg msg = new Msg(qName,nickName,filename,AutoUtil.getCurrentTime());
                         msgs.add(msg);
-                        sendMsgs.add(msgs);
+                        WeixinAutoHandler.sendMsgs.add(msgs);
                     }
                     isSaveImage = true;
                     if(AutoUtil.checkAction(record,"保存图片")){
@@ -335,17 +378,22 @@ public class ChatService extends AccessibilityService {
             while (true){
                 AutoUtil.sleep(1000);
                 if(sendMsgs.size()>0){
-                    List<Msg> msgs = sendMsgs.remove(0);
+                    final  List<Msg> msgs = sendMsgs.remove(0);
                     String json = JSON.toJSONString(msgs);
                     System.out.println("------开始发送消息--------"+json);
-                    uploadMultiFile(url,msgs,null,null);
-                    //LogUtil.d("okHttp",OkHttpUtil.okHttpPost(url,json));
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            uploadMultiFile(url,msgs,null,null);
+                        }
+                    }).start();
+
                 }
             }
         }
     }
     //文件上传到服务器
-    public void uploadMultiFile(String url, final List<Msg> msgs, File file, final String fileName) {
+    private synchronized void  uploadMultiFile(String url, final List<Msg> msgs, File file, final String fileName) {
         if(file==null) file = new File("");
         RequestBody fileBody = RequestBody.create(MediaType.parse("application/octet-stream"), file);
         MultipartBody.Builder builder = new MultipartBody.Builder()
@@ -369,8 +417,8 @@ public class ChatService extends AccessibilityService {
         final okhttp3.OkHttpClient.Builder httpBuilder = new OkHttpClient.Builder();
         OkHttpClient okHttpClient  = httpBuilder
                 //设置超时
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .writeTimeout(15, TimeUnit.SECONDS)
+                .connectTimeout(5, TimeUnit.SECONDS)
+                .writeTimeout(5, TimeUnit.SECONDS)
                 .build();
         okHttpClient.newCall(request).enqueue(new Callback() {
             @Override
@@ -405,9 +453,16 @@ public class ChatService extends AccessibilityService {
             }
         });
     }
+    private String getQnameById(AccessibilityNodeInfo root){
+        String qName = "";
+        AccessibilityNodeInfo qNode = AutoUtil.findNodeInfosById(root,"com.tencent.mm:id/gp");
+        if(qNode!=null){
+            qName = (qNode.getText()+"").replaceAll("\\([\\d]{1,3}\\)","");
+        }
+        return qName;
+    }
     private void messageProcess(List<AccessibilityNodeInfo> ims,AccessibilityNodeInfo msgRoot){
         oldSet = temp.get(qName);
-        System.out.println("oldSet---->"+oldSet);
         if(oldSet==null||oldSet.isEmpty()){
             oldSet = new HashSet<String>();
             List<Msg> dMsgs = DataSupport.where("groupName=?",qName).find(Msg.class);
@@ -415,6 +470,7 @@ public class ChatService extends AccessibilityService {
                 oldSet.add(msg.getNickName()+msg.getMessage());
             }
         }
+        System.out.println("oldSet---->"+oldSet);
         if(ims!=null&&ims.size()>0){
             List<Msg> msgs = new ArrayList<Msg>();
             Set<String> newSet = new HashSet<String>();
@@ -456,9 +512,47 @@ public class ChatService extends AccessibilityService {
             DataSupport.deleteAll(Msg.class,"groupName=?",qName);
             DataSupport.saveAll(saveTempDbMsgs);
             if(msgs.size()>0){
-                sendMsgs.add(msgs);
+                WeixinAutoHandler.sendMsgs.add(msgs);
             }
             temp.put(qName,newSet);
         }
     }
+    private void nocificationPro(AccessibilityEvent event){
+        List<CharSequence>  texts = event.getText();
+        if (!texts.isEmpty()) {
+            for (CharSequence text : texts) {
+                String content = text.toString();
+                Log.i("demo---->", "text:" + content);
+                //--
+                if (event.getParcelableData() != null && event.getParcelableData() instanceof Notification) {
+                    wakeAndUnlock(true);
+                    Log.i("dem---->o", "canGet=true");
+                    //canGet = true;
+                    try {
+                        Notification notification = (Notification) event.getParcelableData();
+                        PendingIntent pendingIntent = notification.contentIntent;
+                        pendingIntent.send();
+                    } catch (PendingIntent.CanceledException e) {
+                        e.printStackTrace();
+                    }
+                }
+                //--
+
+            }
+        }
+    }
+
+    //唤醒屏幕和解锁
+    private PowerManager pm;
+    private PowerManager.WakeLock wl = null;
+    private void wakeAndUnlock(boolean unLock) {
+        if(unLock){
+            if(!pm.isScreenOn()) {
+                wl = pm.newWakeLock(SCREEN_BRIGHT_WAKE_LOCK | ACQUIRE_CAUSES_WAKEUP , "bright");
+                wl.acquire();
+                Log.i("demo-----》", "亮屏");
+            }
+        }
+    }
+
 }
