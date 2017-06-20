@@ -1,11 +1,13 @@
 package hyj.fetchdata;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.ActivityManager;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.os.StrictMode;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -26,8 +28,10 @@ import com.alibaba.fastjson.JSON;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import hyj.fetchdata.util.AutoUtil;
 import hyj.fetchdata.util.GetPermissionUtil;
 import hyj.fetchdata.util.LogUtil;
 import hyj.fetchdata.util.OkHttpUtil;
@@ -52,11 +56,15 @@ public class MainActivity extends AppCompatActivity {
     private ArrayAdapter<String> adapter;
     WeixinAutoHandler handler = null;
 
-
+    @SuppressLint("NewApi")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         GetPermissionUtil.getReadAndWriteContactPermision(this,MainActivity.this);
+
+
+
+
         sharedPreferences = GlobalApplication.getContext().getSharedPreferences("url",MODE_PRIVATE);
         String url = sharedPreferences.getString("url","");
         setContentView(R.layout.activity_main);
@@ -107,8 +115,14 @@ public class MainActivity extends AppCompatActivity {
             new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    String res = OkHttpUtil.okHttpPost(text,json);
-                    LogUtil.d("okHttp",res);
+                    int count=0;
+                    while (true){
+                        count = count+1;
+                        System.out.println("---发送请求---》"+count);
+                        String res = OkHttpUtil.okHttpPost(text,json);
+                        LogUtil.d("okHttp",res);
+                        AutoUtil.sleep(5000);
+                    }
 
                 }
             }).start();

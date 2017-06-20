@@ -26,7 +26,7 @@ import static android.content.ContentValues.TAG;
  * Created by asus on 2017/6/18.
  */
 
-public class SendMsgThread extends Thread {
+public class SendMsgThread extends Thread{
     String url;
     List<Msg> msgs;
     File file;
@@ -40,11 +40,10 @@ public class SendMsgThread extends Thread {
         this.fileName = fileName;
         //this.sendMsgs = sendMsgs;
     }
-    @Override
+  @Override
     public void run() {
         super.run();
         while (true){
-            AutoUtil.sleep(1000);            //List<List<Msg>> sendMsgs = ChatService.sendMsgs;
             synchronized (this){
                 if(WeixinAutoHandler.sendMsgs.size()>0){
                     final  List<Msg> msgs = WeixinAutoHandler.sendMsgs.remove(0);
@@ -61,6 +60,10 @@ public class SendMsgThread extends Thread {
             }
         }
 
+    }
+    public void up(){
+        List<Msg> msgs = WeixinAutoHandler.sendMsgs.remove(0);
+        uploadMultiFile(url,msgs,null,null);
     }
     //文件上传到服务器
     private synchronized void  uploadMultiFile(String url, final List<Msg> msgs, File file, final String fileName) {
@@ -87,8 +90,9 @@ public class SendMsgThread extends Thread {
         final okhttp3.OkHttpClient.Builder httpBuilder = new OkHttpClient.Builder();
         OkHttpClient okHttpClient  = httpBuilder
                 //设置超时
-                .connectTimeout(5, TimeUnit.SECONDS)
-                .writeTimeout(5, TimeUnit.SECONDS)
+                .readTimeout(90, TimeUnit.SECONDS)
+                .connectTimeout(90, TimeUnit.SECONDS)
+                .writeTimeout(90, TimeUnit.SECONDS)
                 .build();
         okHttpClient.newCall(request).enqueue(new Callback() {
             @Override

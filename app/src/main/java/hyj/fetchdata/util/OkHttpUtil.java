@@ -30,7 +30,7 @@ public class OkHttpUtil {
         return reponseData;
     }
     //http post请求
-    public static String okHttpPost(String url,String json){
+    public synchronized  static String okHttpPost(String url,String json){
         String reponseData = "";
         OkHttpClient mOkHttpClient = new OkHttpClient();
         FormBody.Builder builder = new FormBody.Builder();

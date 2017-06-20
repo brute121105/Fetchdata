@@ -100,8 +100,9 @@ public class FileUtil {
                 final okhttp3.OkHttpClient.Builder httpBuilder = new OkHttpClient.Builder();
                 OkHttpClient okHttpClient  = httpBuilder
                         //设置超时
-                        .connectTimeout(10, TimeUnit.SECONDS)
-                        .writeTimeout(15, TimeUnit.SECONDS)
+                        .readTimeout(30, TimeUnit.SECONDS)
+                        .connectTimeout(30, TimeUnit.SECONDS)
+                        .writeTimeout(30, TimeUnit.SECONDS)
                         .build();
                 okHttpClient.newCall(request).enqueue(new Callback() {
                     @Override
