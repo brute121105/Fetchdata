@@ -3,6 +3,8 @@ package hyj.fetchdata;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.ActivityManager;
+import android.app.Notification;
+import android.app.PendingIntent;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -60,11 +62,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+
         GetPermissionUtil.getReadAndWriteContactPermision(this,MainActivity.this);
-
-
-
-
         sharedPreferences = GlobalApplication.getContext().getSharedPreferences("url",MODE_PRIVATE);
         String url = sharedPreferences.getString("url","");
         setContentView(R.layout.activity_main);
@@ -167,8 +167,9 @@ public class MainActivity extends AppCompatActivity {
     private View.OnClickListener uploadListen = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
-            int a = 5/0;
-            File imags = new File("/sdcard/tencent/MicroMsg/WeiXin");
+            Intent intent = new Intent(MainActivity.this,MyService.class);
+            startService(intent);
+          /*  File imags = new File("/sdcard/tencent/MicroMsg/WeiXin");
             if(imags.exists()){
                 File[] imagsList = imags.listFiles();
                 if(imagsList!=null&&imagsList.length>0){
@@ -180,7 +181,7 @@ public class MainActivity extends AppCompatActivity {
             File logFiles = new File("/sdcard/A_hyj_log/");
             File crashFiles = new File("/sdcard/A_hyj_crash/");
             doFile(logFiles);
-            doFile(crashFiles);
+            doFile(crashFiles);*/
         }
     };
 

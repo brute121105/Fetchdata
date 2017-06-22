@@ -1,35 +1,24 @@
 package hyj.fetchdata;
 
 import android.accessibilityservice.AccessibilityService;
-import android.app.KeyguardManager;
 import android.app.Notification;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.media.MediaPlayer;
 import android.os.PowerManager;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
-import android.view.accessibility.AccessibilityWindowInfo;
 import android.widget.Toast;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
 
 import org.litepal.crud.DataSupport;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintStream;
-import java.net.Socket;
-import java.net.SocketException;
-import java.sql.SQLOutput;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -41,7 +30,6 @@ import java.util.concurrent.TimeUnit;
 
 import hyj.fetchdata.util.AutoUtil;
 import hyj.fetchdata.util.Constants;
-import hyj.fetchdata.util.FileUtil;
 import hyj.fetchdata.util.LogUtil;
 import hyj.fetchdata.util.OkHttpUtil;
 import okhttp3.Call;
@@ -55,6 +43,7 @@ import okhttp3.Response;
 
 import static android.content.ContentValues.TAG;
 import static android.os.PowerManager.*;
+import static hyj.fetchdata.WeixinAutoHandler.sendMsgs;
 
 public class ChatService extends AccessibilityService {
     Map<String,Set<String>> temp = new HashMap<String,Set<String>>();
@@ -67,11 +56,7 @@ public class ChatService extends AccessibilityService {
     int qNum;
     List<Msg> saveTempDbMsgs = new ArrayList<Msg>();
     Set<String> oldSet;
-    List<String> uploadFiles = new ArrayList<String>();
-    //static  List<List<Msg>> sendMsgs = new ArrayList<List<Msg>>();
-    static Socket client;
-    static PrintStream out;
-    static BufferedReader buf;
+    static  List<String> uploadFiles = new ArrayList<String>();
     public ChatService() {
         SharedPreferences sharedPreferences = GlobalApplication.getContext().getSharedPreferences("url",MODE_PRIVATE);
         url = sharedPreferences.getString("url","");
@@ -80,11 +65,6 @@ public class ChatService extends AccessibilityService {
         AutoUtil.recordAndLog(record,Constants.CHAT_LISTENING);
         isStart=true;
 
-        //new hyj.fetchdata.SendMsgThread(url,null,null).start();
-        /*fileThread = new FileThread();
-        fileThread.start();
-        sendMsgThread = new SendMsgThread();
-        sendMsgThread.start();*/
     }
     String qName="";
     @Override
@@ -154,39 +134,12 @@ public class ChatService extends AccessibilityService {
         //sendMsgs = Collections.synchronizedList(sendMsgs);
         pm=(PowerManager)GlobalApplication.getContext().getSystemService(Context.POWER_SERVICE);
 
-        new ConnectTcpThread().start();
         ScheduledThreadPoolExecutor stpe = new ScheduledThreadPoolExecutor(5);
-        stpe.scheduleWithFixedDelay(new SendMsgByTCP(),5,1,TimeUnit.SECONDS);
-       /* new Thread(new Runnable() {
-            @Override
-            public void run() {
-                int count = 0;
-                while (true){
-                    List<Msg> saveTempDbMsgs = new ArrayList<Msg>();
-                    Msg m = new Msg();
-                    saveTempDbMsgs.add(m);
-                    m.setMessage(System.currentTimeMillis()+"---");
-                    sendMsgs.add(saveTempDbMsgs);
-                    count = count+1;
-                    System.out.println("----count000--"+count);
-                    new SendMsgThread1(sendMsgs.remove(0)).start();
-                    AutoUtil.sleep(2000);
-                }
-            }
-        }).start();*/
-    }
-    static  class ConnectTcpThread extends Thread{
-        @Override
-        public void run() {
-            try {
-                client = new Socket("39.108.72.49", 20006);
-                client.setSoTimeout(10000);
-                out = new PrintStream(client.getOutputStream());
-                buf =  new BufferedReader(new InputStreamReader(client.getInputStream()));
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+        stpe.scheduleWithFixedDelay(new SendMsgByTCP(),3,1,TimeUnit.SECONDS);
+        if(WeixinAutoHandler.IS_AUTO_ADDFR){
+            stpe.scheduleWithFixedDelay(new FileThread(),3,2,TimeUnit.SECONDS);
         }
+        //stpe.scheduleWithFixedDelay(new SendMsgRunner(),5,5,TimeUnit.SECONDS);
     }
     private class MyThread extends Thread{
         AccessibilityNodeInfo root;
@@ -401,18 +354,15 @@ public class ChatService extends AccessibilityService {
             return true;
         }
     }
-    class FileThread extends Thread{
+    class FileThread implements Runnable{
         @Override
         public void run() {
-            while (true){
-                AutoUtil.sleep(2000);
-                if(uploadFiles.size()>0){
-                    String filename = uploadFiles.remove(0);
-                    File uploadFile = new File("/sdcard/tencent/MicroMsg/WeiXin/"+filename);
-                    System.out.println("------开始上传文件----"+filename);
-                    uploadMultiFile("http://39.108.72.49:8080/upload",null,uploadFile,filename);
-                    //FileUtil.uploadMultiFile(url,uploadFile,filename);
-                }
+            if(uploadFiles.size()>0){
+                String filename = uploadFiles.remove(0);
+                File uploadFile = new File("/sdcard/tencent/MicroMsg/WeiXin/"+filename);
+                System.out.println("------开始上传文件----"+filename);
+                uploadMultiFile(url,null,uploadFile,filename);
+                //uploadMultiFile("http://39.108.72.49:8080/upload",null,uploadFile,filename);
             }
         }
     }
@@ -420,8 +370,8 @@ public class ChatService extends AccessibilityService {
         @Override
         public void run() {
             while (true){
-                if(WeixinAutoHandler.sendMsgs.size()>0){
-                    final  List<Msg> msgs = WeixinAutoHandler.sendMsgs.remove(0);
+                if(sendMsgs.size()>0){
+                    final  List<Msg> msgs = sendMsgs.remove(0);
                     String json = JSON.toJSONString(msgs);
                     System.out.println("------开始发送消息--------"+json);
                     uploadMultiFile(url,msgs,null,null);
@@ -434,30 +384,18 @@ public class ChatService extends AccessibilityService {
     static class SendMsgRunner implements Runnable{
         @Override
         public void run() {
-            if(WeixinAutoHandler.sendMsgs.size()>0){
-                final  List<Msg> msgs = WeixinAutoHandler.sendMsgs.remove(0);
-                String json = JSON.toJSONString(msgs);
-                System.out.println("----http--开始发送消息--------"+json);
-                uploadMultiFile(url,msgs,null,null);
-            }
+            String res = OkHttpUtil.okHttpPost(url,"im Red mi 4A 445566");
+            LogUtil.d("okHttp445566",res);
         }
     }
     static class SendMsgByTCP implements Runnable{
         @Override
         public void run() {
-            if(WeixinAutoHandler.sendMsgs.size()>0){
-                List<Msg> msgs = WeixinAutoHandler.sendMsgs.remove(0);
-                uploadMultiFile(url,msgs,null,null);
+            if(sendMsgs.size()>0){
+                List<Msg> msgs = sendMsgs.remove(0);
                 String json = JSON.toJSONString(msgs);
                 System.out.println("----TCP--开始发送消息--------"+json);
-                out.println(json);
-                try{
-                    //从服务器端接收数据有个时间限制（系统自设，也可以自己设置），超过了这个时间，便会抛出该异常
-                    String echo = buf.readLine();
-                    System.out.println(echo);
-                }catch(Exception e){
-                    System.out.println("Time out, No response");
-                }
+                uploadMultiFile(url,msgs,null,null);
             }
         }
     }
@@ -497,9 +435,9 @@ public class ChatService extends AccessibilityService {
                 Log.e(TAG, "请求失败 e=" + e);
                 if(fileName!=null){
                     Log.i(TAG, "图片上传失败-->" +fileName );
-                    //uploadFiles.add(fileName);
+                    uploadFiles.add(fileName);
                 }else if(msgs!=null){
-                    WeixinAutoHandler.sendMsgs.add(msgs);
+                    sendMsgs.add(msgs);
                     Log.i(TAG, "数据发送失败-->" +JSON.toJSONString(msgs));
                 }
             }
@@ -507,22 +445,32 @@ public class ChatService extends AccessibilityService {
             public void onResponse(Call call, Response response) throws IOException {
                 String responseStr = response.body().string();
                 if(fileName!=null){
-                    if(responseStr.indexOf("文件上传成功")>-1){
+                    if(validRes(responseStr)){
                         Log.i(TAG, "图片上传成功 response=" +responseStr );
                     }else{
                         Log.i(TAG, "图片上传失败 response=" +responseStr );
-                       // uploadFiles.add(fileName);
+                        uploadFiles.add(fileName);
                     }
                 }else if(msgs!=null){
-                    if(responseStr.indexOf("已上传数据")>-1){
+                    if(validRes(responseStr)){
                         Log.i(TAG, "数据发送成功 response=" +responseStr );
                     }else{
                         Log.i(TAG, "数据发送失败 response=" +responseStr );
-                        //sendMsgs.add(msgs);
+                        sendMsgs.add(msgs);
                     }
                 }
             }
         });
+    }
+    private static boolean validRes(String res){
+        boolean flag = false;
+        if(res!=null){
+            if(res.contains("status\":1")||res.contains("status':1")||res.contains("status\":\"1")||res.contains("status':'1")){
+                System.out.println("----true----");
+                flag = true;
+            }
+        }
+        return flag;
     }
 
     private String getQnameById(AccessibilityNodeInfo root){
@@ -566,14 +514,14 @@ public class ChatService extends AccessibilityService {
                         }
                     }
                 }
-                //--个人聊天--nickname---start,个人抓自己发送信息，然后头顶是时间将会不正常
+                //--个人聊天--nickname---start,个人抓自己发送信息，然后头顶是时间将会出现nickname==text
                 if("".equals(nickName)||"null".equals(nickName)){
                     nickName = (textParent.getChild(1).getContentDescription()+"").replace("头像","");
                 }
                 if ("null".equals(nickName)) {
                     nickName = (textParent.getChild(0).getContentDescription()+"").replace("头像","");
                 }
-                getChild(textParent.getChild(0));
+                if(text.equals(nickName)) continue;
                 //--个人聊天--nickname---end
                 //22
                 Msg msg = new Msg(qName,nickName,text,AutoUtil.getCurrentTime());
@@ -595,13 +543,7 @@ public class ChatService extends AccessibilityService {
             DataSupport.saveAll(saveTempDbMsgs);
 
             if(msgs.size()>0){
-                //new SendMsgThread1(msgs).start();
-                WeixinAutoHandler.sendMsgs.add(msgs);
-                  //sendMsgs.add(msgs);
-                //new hyj.fetchdata.SendMsgThread(url,null,null).start();
-                //new Thread(new TxAlThread(url,msgs,"腾讯云")).start();
-                //new Thread(new TxAlThread("http://182.254.233.172:8080/testPost1",msgs,"腾讯云")).start();
-                //new hyj.fetchdata.SendMsgThread(url,null,null).up();
+                sendMsgs.add(msgs);
             }
             temp.put(qName,newSet);
         }
