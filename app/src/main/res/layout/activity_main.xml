@@ -52,7 +52,7 @@
         android:id="@+id/del_upload_file"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="清理缓存"
+        android:text="上传错误日志"
         android:textSize="18sp" />
 
 

@@ -302,7 +302,7 @@ public class ChatService extends AccessibilityService {
                         List<Msg> msgs = new ArrayList<Msg>();
                         Msg msg = new Msg(qName,nickName,filename,AutoUtil.getCurrentTime());
                         msgs.add(msg);
-                        //sendMsgs.add(msgs);
+                        sendMsgs.add(msgs);
                     }
                     isSaveImage = true;
                     if(AutoUtil.checkAction(record,"保存图片")){
