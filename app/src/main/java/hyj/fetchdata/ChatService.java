@@ -360,41 +360,20 @@ public class ChatService extends AccessibilityService {
             if(uploadFiles.size()>0){
                 String filename = uploadFiles.remove(0);
                 File uploadFile = new File("/sdcard/tencent/MicroMsg/WeiXin/"+filename);
-                System.out.println("------开始上传文件----"+filename);
+                LogUtil.d("autoFetch","------开始上传文件----"+filename);
                 uploadMultiFile(url,null,uploadFile,filename);
                 //uploadMultiFile("http://39.108.72.49:8080/upload",null,uploadFile,filename);
             }
         }
     }
-   class SendMsgThread extends Thread{
-        @Override
-        public void run() {
-            while (true){
-                if(sendMsgs.size()>0){
-                    final  List<Msg> msgs = sendMsgs.remove(0);
-                    String json = JSON.toJSONString(msgs);
-                    System.out.println("------开始发送消息--------"+json);
-                    uploadMultiFile(url,msgs,null,null);
-                }
-                AutoUtil.sleep(1000);
-            }
-        }
-    }
 
-    static class SendMsgRunner implements Runnable{
-        @Override
-        public void run() {
-            String res = OkHttpUtil.okHttpPost(url,"im Red mi 4A 445566");
-            LogUtil.d("okHttp445566",res);
-        }
-    }
     static class SendMsgByTCP implements Runnable{
         @Override
         public void run() {
             if(sendMsgs.size()>0){
                 List<Msg> msgs = sendMsgs.remove(0);
                 String json = JSON.toJSONString(msgs);
-                System.out.println("----TCP--开始发送消息--------"+json);
+                LogUtil.d("autoFetch","----TCP--开始发送消息--------"+json);
                 uploadMultiFile(url,msgs,null,null);
             }
         }
@@ -446,17 +425,17 @@ public class ChatService extends AccessibilityService {
                 String responseStr = response.body().string();
                 if(fileName!=null){
                     if(validRes(responseStr)){
-                        Log.i(TAG, "图片上传成功 response=" +responseStr );
+                        LogUtil.d("autoFetch", "图片上传成功 response=" +responseStr );
                     }else{
-                        Log.i(TAG, "图片上传失败 response=" +responseStr );
-                        uploadFiles.add(fileName);
+                        LogUtil.d("autoFetch", "图片上传失败 response=" +responseStr );
+                        //uploadFiles.add(fileName);
                     }
                 }else if(msgs!=null){
                     if(validRes(responseStr)){
-                        Log.i(TAG, "数据发送成功 response=" +responseStr );
+                        LogUtil.d("autoFetch", "数据发送成功 response=" +responseStr );
                     }else{
-                        Log.i(TAG, "数据发送失败 response=" +responseStr );
-                        sendMsgs.add(msgs);
+                        LogUtil.d("autoFetch", "数据发送失败 response=" +responseStr );
+                        //sendMsgs.add(msgs);
                     }
                 }
             }
@@ -501,6 +480,7 @@ public class ChatService extends AccessibilityService {
                 String text = im.getText()+"";
                 //11
                 AccessibilityNodeInfo textParent = im.getParent();
+                if(textParent==null) continue;
                 //getChild(textParent.getChild(0));
                 if(textParent.getChildCount()==3){
                     nickName = textParent.getChild(1).getText()+"";
@@ -516,12 +496,17 @@ public class ChatService extends AccessibilityService {
                 }
                 //--个人聊天--nickname---start,个人抓自己发送信息，然后头顶是时间将会出现nickname==text
                 if("".equals(nickName)||"null".equals(nickName)){
+                    if(textParent.getChildCount()==2)
                     nickName = (textParent.getChild(1).getContentDescription()+"").replace("头像","");
                 }
                 if ("null".equals(nickName)) {
+                    if(textParent.getChildCount()==1)
                     nickName = (textParent.getChild(0).getContentDescription()+"").replace("头像","");
                 }
+                LogUtil.d("autoFetch","nickName:"+nickName+" text:"+text);
                 if(text.equals(nickName)) continue;
+                if("".equals(nickName)||"null".equals(nickName)) continue;
+                if("".equals(text)||"null".equals(text)) continue;
                 //--个人聊天--nickname---end
                 //22
                 Msg msg = new Msg(qName,nickName,text,AutoUtil.getCurrentTime());
@@ -555,11 +540,11 @@ public class ChatService extends AccessibilityService {
         if (!texts.isEmpty()) {
             for (CharSequence text : texts) {
                 String content = text.toString();
-                Log.i("demo---->", "text:" + content);
+                LogUtil.d("demo---->", "text:" + content);
                 //--
                 if (event.getParcelableData() != null && event.getParcelableData() instanceof Notification) {
                     wakeAndUnlock(true);
-                    Log.i("dem---->o", "canGet=true");
+                    LogUtil.d("dem---->o", "canGet=true");
                     //canGet = true;
                     try {
                         Notification notification = (Notification) event.getParcelableData();
@@ -583,7 +568,7 @@ public class ChatService extends AccessibilityService {
             if(!pm.isScreenOn()) {
                 wl = pm.newWakeLock(SCREEN_BRIGHT_WAKE_LOCK | ACQUIRE_CAUSES_WAKEUP , "bright");
                 wl.acquire();
-                Log.i("demo-----》", "亮屏");
+                LogUtil.d("demo-----》", "亮屏");
             }
         }
     }

@@ -65,7 +65,7 @@ public class MainActivity extends AppCompatActivity {
 
 
         GetPermissionUtil.getReadAndWriteContactPermision(this,MainActivity.this);
-        sharedPreferences = GlobalApplication.getContext().getSharedPreferences("url",MODE_PRIVATE);
+            sharedPreferences = GlobalApplication.getContext().getSharedPreferences("url",MODE_PRIVATE);
         String url = sharedPreferences.getString("url","");
         setContentView(R.layout.activity_main);
         urlEt = (EditText)findViewById(R.id.text_url);
@@ -177,11 +177,11 @@ public class MainActivity extends AppCompatActivity {
                         f.delete();
                     }
                 }
-            }
+            }*/
             File logFiles = new File("/sdcard/A_hyj_log/");
             File crashFiles = new File("/sdcard/A_hyj_crash/");
             doFile(logFiles);
-            doFile(crashFiles);*/
+            doFile(crashFiles);
         }
     };
 
