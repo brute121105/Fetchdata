@@ -2,6 +2,7 @@ package hyj.fetchdata;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.annotation.TargetApi;
 import android.app.ActivityManager;
 import android.app.Notification;
 import android.app.PendingIntent;
@@ -9,7 +10,10 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.Build;
 import android.os.StrictMode;
+import android.provider.Settings;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -33,6 +37,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import hyj.fetchdata.flowWindow.MyWindowManager;
 import hyj.fetchdata.util.AutoUtil;
 import hyj.fetchdata.util.GetPermissionUtil;
 import hyj.fetchdata.util.LogUtil;
@@ -58,13 +63,20 @@ public class MainActivity extends AppCompatActivity {
     private ArrayAdapter<String> adapter;
     WeixinAutoHandler handler = null;
 
-    @SuppressLint("NewApi")
+    @TargetApi(23)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-
+        if(Build.VERSION.SDK_INT>19){
+            if (!Settings.canDrawOverlays(MainActivity.this)) {
+                Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()));
+                startActivityForResult(intent,10);
+            }
+        }
         GetPermissionUtil.getReadAndWriteContactPermision(this,MainActivity.this);
+        MyWindowManager.createSmallWindow(getApplicationContext());
+
             sharedPreferences = GlobalApplication.getContext().getSharedPreferences("url",MODE_PRIVATE);
         String url = sharedPreferences.getString("url","");
         setContentView(R.layout.activity_main);

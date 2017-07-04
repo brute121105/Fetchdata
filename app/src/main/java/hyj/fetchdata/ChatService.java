@@ -69,6 +69,11 @@ public class ChatService extends AccessibilityService {
     String qName="";
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
+        if(WeixinAutoHandler.IS_PAUSE){
+            LogUtil.d("autoFetch","服务暂停..");
+            return;
+        }
+
         String className = event.getClassName()+"";
         String packageName = event.getPackageName()+"";
         isStart=false;
@@ -101,7 +106,6 @@ public class ChatService extends AccessibilityService {
                 getqImageANdNameThenClidk(listView);
             }
 
-
             if(AutoUtil.checkAction(record,Constants.CHAT_ACTION_04)){
                 MyThread thread = new MyThread(root);
                 thread.start();
@@ -131,6 +135,7 @@ public class ChatService extends AccessibilityService {
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
+        WeixinAutoHandler.IS_START_SERVICE=true;
         //sendMsgs = Collections.synchronizedList(sendMsgs);
         pm=(PowerManager)GlobalApplication.getContext().getSystemService(Context.POWER_SERVICE);
 
